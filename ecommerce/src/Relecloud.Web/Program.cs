@@ -1,4 +1,5 @@
 ﻿using Relecloud.Web;
+using Azure.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 

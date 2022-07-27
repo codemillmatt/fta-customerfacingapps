@@ -13,7 +13,9 @@
       "launchBrowser": true,
       "launchUrl": "https://localhost:44358/",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "VaultUri": "https://vslive-setup-keyvault.vault.azure.net/",
+        "AZURE_USERNAME": "masoucou@microsoft.com"
       }
     },
     "Relecloud.Web": {
@@ -22,7 +24,9 @@
       "launchBrowser": true,
       "applicationUrl": "https://localhost:7228;http://localhost:5228",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "VaultUri": "https://vslive-setup-keyvault.vault.azure.net/",
+        "AZURE_USERNAME": "masoucou@microsoft.com"
       }
     }
   }

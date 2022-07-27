@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+﻿using Azure.Identity;
+using Azure.Security.KeyVault.Secrets;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
@@ -45,6 +47,13 @@ namespace Relecloud.Web
             var storageAccountConnectionString = Configuration.GetValue<string>("App:StorageAccount:ConnectionString");
             var storageAccountEventQueueName = Configuration.GetValue<string>("App:StorageAccount:EventQueueName");
             var applicationInsightsConnectionString = Configuration.GetValue<string>("App:ApplicationInsights:ConnectionString");
+            var keyVaultUri = Configuration.GetValue<string>("App:KeyVault:Uri");
+
+            if (!string.IsNullOrEmpty(keyVaultUri))
+            {
+                var client = new SecretClient(new Uri(keyVaultUri), new DefaultAzureCredential());
+                sqlDatabaseConnectionString = client.GetSecret("App-SqlDatabase-ConnectionString").Value.Value;
+            }
            
             var cdnUrlString = Configuration.GetValue<string>("App:Cdn:Url");
             var cdnUrl = default(Uri);
@@ -112,8 +121,8 @@ namespace Relecloud.Web
                 services.AddApplicationInsightsTelemetry();
             }
             else
-            {
-                services.AddApplicationInsightsTelemetry(applicationInsightsConnectionString);
+            { 
+                services.AddApplicationInsightsTelemetry(options => options.ConnectionString = applicationInsightsConnectionString);
             }
 
             // The ApplicationInitializer is injected in the Configure method with all its dependencies and will ensure
