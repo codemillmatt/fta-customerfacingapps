@@ -1,0 +1,24 @@
+{
+  "dependencies": {
+    "appInsights1": {
+      "ignored": "true",
+      "type": "appInsights"
+    },
+    "identityapp1": {
+      "ignored": "true",
+      "type": "identityapp"
+    },
+    "redis1": {
+      "ignored": "true",
+      "type": "redis"
+    },
+    "storage1": {
+      "ignored": "true",
+      "type": "storage"
+    },
+    "mssql1": {
+      "type": "mssql",
+      "connectionId": "App:SqlDatabase:ConnectionString"
+    }
+  }
+}

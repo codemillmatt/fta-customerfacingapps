@@ -37,13 +37,15 @@ namespace Relecloud.Web
             });
 
             // Retrieve application settings.
-            var redisCacheConnectionString = Configuration.GetValue<string>("App:RedisCache:ConnectionString");
             var sqlDatabaseConnectionString = Configuration.GetValue<string>("App:SqlDatabase:ConnectionString");
+
+            var redisCacheConnectionString = Configuration.GetValue<string>("App:RedisCache:ConnectionString");
             var azureSearchServiceName = Configuration.GetValue<string>("App:AzureSearch:ServiceName");
             var azureSearchAdminKey = Configuration.GetValue<string>("App:AzureSearch:AdminKey");
             var storageAccountConnectionString = Configuration.GetValue<string>("App:StorageAccount:ConnectionString");
             var storageAccountEventQueueName = Configuration.GetValue<string>("App:StorageAccount:EventQueueName");
             var applicationInsightsConnectionString = Configuration.GetValue<string>("App:ApplicationInsights:ConnectionString");
+           
             var cdnUrlString = Configuration.GetValue<string>("App:Cdn:Url");
             var cdnUrl = default(Uri);
             if (Uri.TryCreate(cdnUrlString, UriKind.Absolute, out cdnUrl))
@@ -58,6 +60,8 @@ namespace Relecloud.Web
                 // If not, ASP.NET Core automatically injects an in-memory cache.
                 services.AddDistributedRedisCache(options => { options.Configuration = redisCacheConnectionString; });
             }
+
+
             if (string.IsNullOrWhiteSpace(sqlDatabaseConnectionString))
             {
                 // Add a dummy concert repository in case the Azure SQL Database isn't provisioned and configured yet.
@@ -70,6 +74,7 @@ namespace Relecloud.Web
                 // Add a concert repository based on Azure SQL Database.
                 services.AddDbContextPool<ConcertDataContext>(options => options.UseSqlServer(sqlDatabaseConnectionString));
                 services.AddScoped<IConcertRepository, SqlDatabaseConcertRepository>();
+
                 if (string.IsNullOrWhiteSpace(azureSearchServiceName) || string.IsNullOrWhiteSpace(azureSearchAdminKey))
                 {
                     // Add a dummy concert search service in case the Azure Search service isn't provisioned and configured yet.
@@ -81,6 +86,10 @@ namespace Relecloud.Web
                     services.AddScoped<IConcertSearchService>(x => new AzureSearchConcertSearchService(azureSearchServiceName, azureSearchAdminKey, sqlDatabaseConnectionString));
                 }
             }
+
+
+            
+           
             if (string.IsNullOrWhiteSpace(storageAccountConnectionString) || string.IsNullOrWhiteSpace(storageAccountEventQueueName))
             {
                 // Add a dummy event sender service in case the Azure Storage account isn't provisioned and configured yet.

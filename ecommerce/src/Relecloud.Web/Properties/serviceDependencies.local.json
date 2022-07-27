@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "mssql1": {
+      "secretStore": "LocalSecretsFile",
+      "resourceId": "/subscriptions/[parameters('subscriptionId')]/resourceGroups/[parameters('resourceGroupName')]/providers/Microsoft.Sql/servers/vslive-setup-sqlserver/databases/vslive-setup-sql-database",
+      "type": "mssql.azure",
+      "connectionId": "App:SqlDatabase:ConnectionString"
+    }
+  }
+}
