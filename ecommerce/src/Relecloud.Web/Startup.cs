@@ -14,6 +14,8 @@ using Relecloud.Web.Services.SqlDatabaseEventRepository;
 using Relecloud.Web.Services.StorageAccountEventSenderService;
 using System.Security.Claims;
 
+using Microsoft.Extensions.Configuration;
+
 namespace Relecloud.Web
 {
     public class Startup
@@ -39,7 +41,7 @@ namespace Relecloud.Web
             });
 
             // Retrieve application settings.
-            var sqlDatabaseConnectionString = Configuration.GetValue<string>("App:SqlDatabase:ConnectionString");
+            var sqlDatabaseConnectionString = Configuration.GetValue<string>("App:SqlDatabase:ConnectionString");// Configuration.GetValue<string>("App:SqlDatabase:ConnectionString");
 
             var redisCacheConnectionString = Configuration.GetValue<string>("App:RedisCache:ConnectionString");
             var azureSearchServiceName = Configuration.GetValue<string>("App:AzureSearch:ServiceName");
@@ -47,13 +49,6 @@ namespace Relecloud.Web
             var storageAccountConnectionString = Configuration.GetValue<string>("App:StorageAccount:ConnectionString");
             var storageAccountEventQueueName = Configuration.GetValue<string>("App:StorageAccount:EventQueueName");
             var applicationInsightsConnectionString = Configuration.GetValue<string>("App:ApplicationInsights:ConnectionString");
-            var keyVaultUri = Configuration.GetValue<string>("App:KeyVault:Uri");
-
-            if (!string.IsNullOrEmpty(keyVaultUri))
-            {
-                var client = new SecretClient(new Uri(keyVaultUri), new DefaultAzureCredential());
-                sqlDatabaseConnectionString = client.GetSecret("App-SqlDatabase-ConnectionString").Value.Value;
-            }
            
             var cdnUrlString = Configuration.GetValue<string>("App:Cdn:Url");
             var cdnUrl = default(Uri);
@@ -134,6 +129,8 @@ namespace Relecloud.Web
             services.AddSession();
         }
 
+        
+
         private void AddAzureAdB2cServices(IServiceCollection services)
         {
             services.AddRazorPages().AddMicrosoftIdentityUI();
@@ -203,7 +200,7 @@ namespace Relecloud.Web
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(WebApplication app)
-        {
+        {      
             using var serviceScope = app.Services.CreateScope();
             serviceScope.ServiceProvider.GetService<ApplicationInitializer>();
 
