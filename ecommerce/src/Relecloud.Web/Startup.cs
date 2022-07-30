@@ -41,9 +41,10 @@ namespace Relecloud.Web
             });
 
             // Retrieve application settings.
-            var sqlDatabaseConnectionString = Configuration.GetValue<string>("App:SqlDatabase:ConnectionString");// Configuration.GetValue<string>("App:SqlDatabase:ConnectionString");
+            var sqlDatabaseConnectionString = Configuration.GetValue<string>("App:SqlDatabase:ConnectionString");
 
             var redisCacheConnectionString = Configuration.GetValue<string>("App:RedisCache:ConnectionString");
+
             var azureSearchServiceName = Configuration.GetValue<string>("App:AzureSearch:ServiceName");
             var azureSearchAdminKey = Configuration.GetValue<string>("App:AzureSearch:AdminKey");
             var storageAccountConnectionString = Configuration.GetValue<string>("App:StorageAccount:ConnectionString");
