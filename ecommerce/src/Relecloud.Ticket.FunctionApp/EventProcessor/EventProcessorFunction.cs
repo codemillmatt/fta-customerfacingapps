@@ -1,37 +1,34 @@
-using Azure;
-using Azure.AI.TextAnalytics;
-using Azure.Storage.Blobs;
-using Azure.Storage.Sas;
-using Microsoft.Azure.Functions.Worker;
-using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
+using System;
 using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Host;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
+using System.Threading.Tasks;
+using System.Runtime.InteropServices;
+using System.IO;
+using Microsoft.Data.SqlClient;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
-using System.Runtime.InteropServices;
+using Azure.Storage.Blobs;
+using Azure.Storage.Sas;
 
-namespace Relecloud.FunctionApp.EventProcessor
+namespace Relecloud.Ticket.FunctionApp.EventProcessor
 {
-    
     public class EventProcessorFunction
     {
-        private readonly ILogger _logger;
         private readonly IConfiguration _configuration;
 
-        public EventProcessorFunction(ILoggerFactory loggerFactory, IConfiguration configuration)
+        public EventProcessorFunction(IConfiguration configuration)
         {
-            _logger = loggerFactory.CreateLogger<EventProcessorFunction>();
             _configuration = configuration;
         }
 
-        [Function("EventProcessor")]
-        public async Task Run(
-            [QueueTrigger("relecloudconcertevents", Connection ="VSLiveSetupStorage")]
-            Event eventInfo)
+        [FunctionName("TicketImageGenerator")]
+        public async Task Run([QueueTrigger("relecloudconcertevents", Connection = "VSLiveStorageConnection")]Event eventInfo, 
+            ILogger log)
         {
-            _logger.LogInformation($"Received event type \"{eventInfo.EventType}\" for entity \"{eventInfo.EntityId}\"");
+            log.LogInformation($"C# Queue trigger function processed: {eventInfo.EventType}");
 
             try
             {
@@ -41,33 +38,33 @@ namespace Relecloud.FunctionApp.EventProcessor
                     if (int.TryParse(eventInfo.EntityId, out var ticketId)
                         && !string.IsNullOrWhiteSpace(sqlDatabaseConnectionString))
                     {
-                        await CreateTicketImageAsync(ticketId);
+                        await CreateTicketImageAsync(ticketId, log);
                     }
                 }
                 else if ("ReviewCreated".Equals(eventInfo.EventType, StringComparison.OrdinalIgnoreCase))
                 {
-                    var sqlDatabaseConnectionString = _configuration.GetValue<string>("App:SqlDatabase:ConnectionString");
-                    var cognitiveServicesEndpointUri = _configuration.GetValue<string>("App:CognitiveServices:EndpointUri");
-                    var cognitiveServicesApiKey = _configuration.GetValue<string>("App:CognitiveServices:ApiKey");
-                    if (int.TryParse(eventInfo.EntityId, out var reviewId)
-                        && !string.IsNullOrWhiteSpace(sqlDatabaseConnectionString)
-                        && !string.IsNullOrWhiteSpace(cognitiveServicesEndpointUri)
-                        && !string.IsNullOrWhiteSpace(cognitiveServicesApiKey))
-                    {
-                        await CalculateReviewSentimentScoreAsync(sqlDatabaseConnectionString, cognitiveServicesEndpointUri, cognitiveServicesApiKey, reviewId);
-                    }
+                    //var sqlDatabaseConnectionString = _configuration.GetValue<string>("App:SqlDatabase:ConnectionString");
+                    //var cognitiveServicesEndpointUri = _configuration.GetValue<string>("App:CognitiveServices:EndpointUri");
+                    //var cognitiveServicesApiKey = _configuration.GetValue<string>("App:CognitiveServices:ApiKey");
+                    //if (int.TryParse(eventInfo.EntityId, out var reviewId)
+                    //    && !string.IsNullOrWhiteSpace(sqlDatabaseConnectionString)
+                    //    && !string.IsNullOrWhiteSpace(cognitiveServicesEndpointUri)
+                    //    && !string.IsNullOrWhiteSpace(cognitiveServicesApiKey))
+                    //{
+                        //await CalculateReviewSentimentScoreAsync(sqlDatabaseConnectionString, cognitiveServicesEndpointUri, cognitiveServicesApiKey, reviewId);
+                    //}
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unable to process the TicketCreated event");
+                log.LogError(ex, "Unable to process the TicketCreated event");
                 throw;
             }
         }
 
         #region Create Ticket Image
 
-        private async Task CreateTicketImageAsync(int ticketId)
+        private async Task CreateTicketImageAsync(int ticketId, ILogger logger)
         {
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
@@ -78,7 +75,7 @@ namespace Relecloud.FunctionApp.EventProcessor
             using var connection = new SqlConnection(_configuration.GetValue<string>("App:SqlDatabase:ConnectionString"));
 
             // Retrieve the ticket from the database.
-            _logger.LogInformation($"Retrieving details for ticket \"{ticketId}\" from SQL Database...");
+            logger.LogInformation($"Retrieving details for ticket \"{ticketId}\" from SQL Database...");
             await connection.OpenAsync();
             var getTicketCommand = connection.CreateCommand();
             getTicketCommand.CommandText = "SELECT Concerts.Artist, Concerts.Location, Concerts.StartTime, Concerts.Price, Users.DisplayName FROM Tickets INNER JOIN Concerts ON Tickets.ConcertId = Concerts.Id INNER JOIN Users ON Tickets.UserId = Users.Id WHERE Tickets.Id = @id";
@@ -89,7 +86,7 @@ namespace Relecloud.FunctionApp.EventProcessor
                 var hasRows = await ticketDataReader.ReadAsync();
                 if (hasRows == false)
                 {
-                    _logger.LogWarning($"No Ticket found for id:{ticketId}");
+                    logger.LogWarning($"No Ticket found for id:{ticketId}");
                     return; //this ticket was not found
                 }
 
@@ -124,24 +121,25 @@ namespace Relecloud.FunctionApp.EventProcessor
                     }
 
                     // Save to blob storage.
-                    _logger.LogInformation("Uploading image to blob storage...");
+                    logger.LogInformation("Uploading image to blob storage...");
                     bitmap.Save(ticketImageBlob, ImageFormat.Png);
                 }
             }
             ticketImageBlob.Position = 0;
-            _logger.LogInformation("Successfully generated image.");
+            logger.LogInformation("Successfully generated image.");
 
             var storageAccountConnStr = _configuration.GetValue<string>("App:StorageAccount:ConnectionString");
             var blobServiceClient = new BlobServiceClient(storageAccountConnStr);
 
             //  Gets a reference to the container.
-            var blobContainerClient = blobServiceClient.GetBlobContainerClient("tickets");
+            var containerName = _configuration.GetValue<string>("App:StorageAccount:TicketContainerName");
+            var blobContainerClient = blobServiceClient.GetBlobContainerClient(containerName);
 
             //  Gets a reference to the blob in the container
             var blobClient = blobContainerClient.GetBlobClient($"ticket-{ticketId}.png");
             var blobInfo = await blobClient.UploadAsync(ticketImageBlob, overwrite: true);
 
-            _logger.LogInformation("Successfully wrote blob to storage.");
+            logger.LogInformation("Successfully wrote blob to storage.");
 
             // Update the ticket in the database with the image URL.
             // Creates a client to the BlobService using the connection string.
@@ -159,56 +157,14 @@ namespace Relecloud.FunctionApp.EventProcessor
             //  Builds the Sas URI.
             var queryUri = blobClient.GenerateSasUri(blobSasBuilder);
 
-            _logger.LogInformation($"Updating ticket with image URL {queryUri}...");
+            logger.LogInformation($"Updating ticket with image URL {queryUri}...");
             var updateTicketCommand = connection.CreateCommand();
             updateTicketCommand.CommandText = "UPDATE Tickets SET ImageUrl=@imageUrl WHERE Id=@id";
             updateTicketCommand.Parameters.Add(new SqlParameter("id", ticketId));
             updateTicketCommand.Parameters.Add(new SqlParameter("imageUrl", queryUri.ToString()));
             await updateTicketCommand.ExecuteNonQueryAsync();
 
-            _logger.LogInformation("Successfully updated database with SAS.");
-        }
-
-        #endregion
-
-        #region Calculate Review Sentiment Score
-
-        private async Task CalculateReviewSentimentScoreAsync(string sqlDatabaseConnectionString, string cognitiveServicesEndpointUri, string cognitiveServicesApiKey, int reviewId)
-        {
-            using var connection = new SqlConnection(sqlDatabaseConnectionString);
-            await connection.OpenAsync();
-
-            // Retrieve the review description.
-            _logger.LogInformation($"Retrieving description for review \"{reviewId}\" from SQL Database...");
-            var getDescriptionCommand = connection.CreateCommand();
-            getDescriptionCommand.CommandText = "SELECT Description FROM Reviews WHERE Id=@id";
-            getDescriptionCommand.Parameters.Add(new SqlParameter("id", reviewId));
-            var reviewDescription = (string?)await getDescriptionCommand.ExecuteScalarAsync();
-            if (reviewDescription is null)
-            {
-                return; //there is no comment to analyze
-            }
-
-            // Perform a sentiment analysis on the text.
-            // Scores close to 1 indicate positive sentiment, while scores close to 0 indicate negative sentiment.
-            _logger.LogInformation($"Performing sentiment analysis on text: \"{reviewDescription}\"...");
-            var sentimentScore = await GetSentimentScoreAsync(reviewDescription, cognitiveServicesEndpointUri, cognitiveServicesApiKey);
-
-            // Update the document with the sentiment value.
-            _logger.LogInformation($"Updating review with sentiment score {sentimentScore}...");
-            var updateSentimentScoreCommand = connection.CreateCommand();
-            updateSentimentScoreCommand.CommandText = "UPDATE Reviews SET SentimentScore=@sentimentScore WHERE Id=@id";
-            updateSentimentScoreCommand.Parameters.Add(new SqlParameter("id", reviewId));
-            updateSentimentScoreCommand.Parameters.Add(new SqlParameter("sentimentScore", sentimentScore));
-            await updateSentimentScoreCommand.ExecuteNonQueryAsync();
-        }
-
-        private async Task<float> GetSentimentScoreAsync(string text, string cognitiveServicesEndpointUri, string cognitiveServicesApiKey)
-        {
-            var credentials = new AzureKeyCredential(cognitiveServicesApiKey);
-            var client = new TextAnalyticsClient(new Uri(cognitiveServicesEndpointUri), credentials);
-            var reviews = await client.AnalyzeSentimentAsync(text);
-            return (float)reviews.Value.ConfidenceScores.Positive;
+            logger.LogInformation("Successfully updated database with SAS.");
         }
 
         #endregion
