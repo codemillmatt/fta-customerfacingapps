@@ -9,8 +9,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 var appConfigUri = builder.Configuration.GetValue<string>("App:AppConfig:Uri");
 
-
-
 builder.Host.ConfigureAppConfiguration(builder =>
 {
     //Connect to your App Config Store using the connection string    
